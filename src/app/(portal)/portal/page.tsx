@@ -103,7 +103,7 @@ export default function PortalDashboard() {
           supabase
             .from('notifications')
             .select('*')
-            .eq('user_id', eid)
+            .eq('employee_id', eid)
             .eq('is_read', false)
             .order('created_at', { ascending: false })
             .limit(3),
@@ -144,7 +144,7 @@ export default function PortalDashboard() {
     const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
-      .eq('user_id', employee.employee_id)
+      .eq('employee_id', employee.employee_id)
       .eq('is_read', false)
     if (!error) setNotifications([])
   }

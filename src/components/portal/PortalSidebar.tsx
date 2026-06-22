@@ -1,4 +1,5 @@
-'use client'
+﻿'use client'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -39,16 +40,11 @@ export function PortalSidebar() {
 
   return (
     <aside className="w-64 min-h-screen bg-gray-900 text-white flex flex-col fixed left-0 top-0 bottom-0 z-40">
-      <div className="p-6 border-b border-gray-700">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm">
-            AX
-          </div>
-          <div>
-            <p className="font-semibold text-sm leading-tight">AeonX Digital</p>
-            <p className="text-xs text-gray-400 leading-tight">My PMS Portal</p>
-          </div>
+      <div className="p-5 border-b border-gray-700">
+        <div className="bg-white rounded-xl px-4 py-2.5 flex items-center justify-center">
+          <Image src="/aeonx-logo.png" alt="AeonX Digital" width={120} height={40} style={{ height: 'auto' }} priority />
         </div>
+        <p className="text-xs text-gray-500 text-center mt-2">My PMS Portal</p>
       </div>
 
       {/* Employee info */}

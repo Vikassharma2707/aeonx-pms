@@ -13,11 +13,24 @@ export async function getCurrentEmployee(): Promise<AuthEmployee | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const { data: emp } = await supabase
+  let { data: emp } = await supabase
     .from('employees')
     .select('*')
     .eq('user_id', user.id)
     .single()
+
+  // Fallback: match by email (case-insensitive) and auto-link user_id
+  if (!emp && user.email) {
+    const { data: byEmail } = await supabase
+      .from('employees')
+      .select('*')
+      .ilike('email', user.email)
+      .single()
+    if (byEmail) {
+      await supabase.from('employees').update({ user_id: user.id }).eq('id', byEmail.id)
+      emp = { ...byEmail, user_id: user.id }
+    }
+  }
 
   if (!emp) return null
 

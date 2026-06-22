@@ -21,6 +21,7 @@ import {
   STATUS_COLORS,
 } from '@/lib/constants'
 import type { Goal } from '@/lib/supabase'
+import { Lock } from 'lucide-react'
 
 // â”€â”€â”€ Category color chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CATEGORY_COLORS: Record<string, string> = {
@@ -84,11 +85,12 @@ function Field({ label, required, children }: { label: string; required?: boolea
 type GoalCardProps = {
   goal: Goal
   isOwner: boolean
+  locked: boolean
   onSave: (id: string, patch: Partial<Goal>) => Promise<void>
   onDelete: (id: string) => Promise<void>
 }
 
-function GoalCard({ goal, isOwner, onSave, onDelete }: GoalCardProps) {
+function GoalCard({ goal, isOwner, locked, onSave, onDelete }: GoalCardProps) {
   const [status, setStatus] = useState(goal.goal_status)
   const [progress, setProgress] = useState(String(goal.self_progress_percent ?? ''))
   const [rating, setRating] = useState(String(goal.self_rating ?? ''))
@@ -119,7 +121,8 @@ function GoalCard({ goal, isOwner, onSave, onDelete }: GoalCardProps) {
   }
 
   const catColor = CATEGORY_COLORS[goal.goal_category ?? ''] ?? 'bg-gray-100 text-gray-600'
-  const canDelete = isOwner && goal.goal_status === 'Not Started'
+  const canDelete = isOwner && !locked && goal.goal_status === 'Not Started'
+  const canEdit = isOwner && !locked
 
   return (
     <Card className="overflow-hidden">
@@ -171,7 +174,7 @@ function GoalCard({ goal, isOwner, onSave, onDelete }: GoalCardProps) {
             <Select
               value={status}
               onChange={(e) => { setStatus(e.target.value as typeof goal.goal_status); mark() }}
-              disabled={!isOwner}
+              disabled={!canEdit}
               options={GOAL_STATUSES.map((s) => ({ label: s, value: s }))}
             />
           </Field>
@@ -184,7 +187,7 @@ function GoalCard({ goal, isOwner, onSave, onDelete }: GoalCardProps) {
               placeholder="0 â€“ 100"
               value={progress}
               onChange={(e) => { setProgress(e.target.value); mark() }}
-              disabled={!isOwner}
+              disabled={!canEdit}
             />
           </Field>
 
@@ -197,7 +200,7 @@ function GoalCard({ goal, isOwner, onSave, onDelete }: GoalCardProps) {
               placeholder="e.g. 3.5"
               value={rating}
               onChange={(e) => { setRating(e.target.value); mark() }}
-              disabled={!isOwner}
+              disabled={!canEdit}
             />
           </Field>
 
@@ -218,7 +221,7 @@ function GoalCard({ goal, isOwner, onSave, onDelete }: GoalCardProps) {
             placeholder="Add notes or comments about this goalâ€¦"
             value={comments}
             onChange={(e) => { setComments(e.target.value); mark() }}
-            disabled={!isOwner}
+            disabled={!canEdit}
             rows={3}
           />
         </Field>
@@ -238,13 +241,13 @@ function GoalCard({ goal, isOwner, onSave, onDelete }: GoalCardProps) {
             <span />
           )}
 
-          {isOwner && (
+          {canEdit && (
             <Button
               size="sm"
               onClick={handleSave}
               disabled={saving || !dirty}
             >
-              {saving ? 'Savingâ€¦' : dirty ? 'Save Changes' : 'Saved'}
+              {saving ? 'Saving...' : dirty ? 'Save Changes' : 'Saved'}
             </Button>
           )}
         </div>
@@ -261,12 +264,19 @@ export default function MyGoalsPage() {
   const [goals, setGoals] = useState<Goal[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [goalsLocked, setGoalsLocked] = useState(false)
 
   // Modal
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState<GoalForm>(EMPTY_FORM)
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // Fetch lock status
+  useEffect(() => {
+    supabase.from('appraisal_settings').select('goals_locked').order('fiscal_year', { ascending: false }).limit(1).single()
+      .then(({ data }) => { if (data) setGoalsLocked(!!data.goals_locked) })
+  }, [])
 
   // Fetch goals
   useEffect(() => {
@@ -396,8 +406,18 @@ export default function MyGoalsPage() {
               options={FISCAL_YEARS.map((y) => ({ label: y, value: y }))}
             />
           </div>
-          <Button onClick={openAddModal}>+ Add Goal</Button>
+          {!goalsLocked && <Button onClick={openAddModal}>+ Add Goal</Button>}
         </div>
+
+        {goalsLocked && (
+          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3">
+            <Lock size={16} className="text-red-500 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-red-800">Goals are locked</p>
+              <p className="text-xs text-red-600 mt-0.5">The appraisal deadline has passed. Goals are now read-only. Contact HR if you need changes.</p>
+            </div>
+          </div>
+        )}
 
         {/* Weight summary bar */}
         <div className={cn(
@@ -470,6 +490,7 @@ export default function MyGoalsPage() {
                 key={goal.id}
                 goal={goal}
                 isOwner
+                locked={goalsLocked}
                 onSave={handleSave}
                 onDelete={handleDelete}
               />
