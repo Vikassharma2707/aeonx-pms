@@ -1,13 +1,15 @@
 'use client'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { signOut } from '@/lib/auth'
 import {
   LayoutDashboard,
   Users,
   Target,
   ClipboardList,
   MessageSquare,
+  LogOut,
   FileCheck,
   Award,
   ChevronRight,
@@ -25,6 +27,12 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  async function handleSignOut() {
+    await signOut()
+    router.replace('/login')
+  }
 
   return (
     <aside className="w-64 min-h-screen bg-gray-900 text-white flex flex-col fixed left-0 top-0 bottom-0 z-40">
@@ -62,8 +70,15 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-700">
+      <div className="p-4 border-t border-gray-700 space-y-2">
         <p className="text-xs text-gray-500 text-center">FY 2026-27</p>
+        <button
+          onClick={handleSignOut}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-red-900/40 hover:text-red-300 transition-colors"
+        >
+          <LogOut size={16} />
+          <span>Sign Out</span>
+        </button>
       </div>
     </aside>
   )

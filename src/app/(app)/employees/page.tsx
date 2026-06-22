@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
-import { supabase, Employee } from '@/lib/supabase'
+import { supabase, getSupabase, Employee } from '@/lib/supabase'
 import { PRACTICES, EMPLOYMENT_TYPES, STATUS_COLORS } from '@/lib/constants'
 import { formatDate } from '@/lib/utils'
-import { Plus, Pencil, Trash2, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Mail } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -189,6 +189,24 @@ export default function EmployeesPage() {
     }
   }
 
+  // ── Invite helper ─────────────────────────────────────────────────────────
+
+  async function handleInvite(emp: Employee) {
+    if (!emp.email) {
+      alert('Employee has no email address. Please add one first.')
+      return
+    }
+    if (!confirm(`Send login invite to ${emp.email}?`)) return
+    try {
+      const supabaseAdmin = getSupabase()
+      const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(emp.email)
+      if (error) throw error
+      alert(`Invite sent to ${emp.email}`)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to send invite')
+    }
+  }
+
   // ── Delete helpers ─────────────────────────────────────────────────────────
 
   function openDelete(emp: Employee) {
@@ -363,6 +381,13 @@ export default function EmployeesPage() {
                             title="Edit"
                           >
                             <Pencil size={15} />
+                          </button>
+                          <button
+                            onClick={() => handleInvite(emp)}
+                            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title={emp.email ? `Send login invite to ${emp.email}` : 'No email — add one first'}
+                          >
+                            <Mail size={15} />
                           </button>
                           <button
                             onClick={() => openDelete(emp)}
