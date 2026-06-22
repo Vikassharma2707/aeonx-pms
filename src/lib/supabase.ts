@@ -38,6 +38,7 @@ export type Employee = {
   practice?: 'SAP' | 'Cloud' | 'DevOps' | 'PMO / Other'
   location?: string
   line_manager?: string
+  project_manager?: string
   hire_date?: string
   employment_type?: 'Full Time' | 'Contract' | 'Intern'
   active_status: 'Active' | 'Inactive'

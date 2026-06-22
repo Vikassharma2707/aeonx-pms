@@ -21,7 +21,7 @@ export function PortalSidebar() {
   const router = useRouter()
   const { employee } = useAuth()
 
-  const isManager = employee?.role === 'manager' || employee?.role === 'hr'
+  const isManager = employee?.role === 'hr' || employee?.isLineManager || employee?.isProjectManager
 
   const navItems = [
     { href: '/portal', label: 'My Dashboard', icon: LayoutDashboard, exact: true },

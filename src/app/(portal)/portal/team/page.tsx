@@ -3,7 +3,6 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/Header'
@@ -17,7 +16,6 @@ import { cn } from '@/lib/utils'
 import { FISCAL_YEARS, QUARTERS, STATUS_COLORS } from '@/lib/constants'
 import type { Employee, Goal, QuarterlyTask } from '@/lib/supabase'
 
-// ─── Extended Task with submission fields ─────────────────────────────────────
 type Task = QuarterlyTask & {
   submission_status?: 'draft' | 'submitted' | 'reviewed'
   submitted_to?: string
@@ -25,7 +23,8 @@ type Task = QuarterlyTask & {
   pm_comments?: string
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+type Tab = 'overview' | 'pending' | 'goals'
+
 function Spinner() {
   return <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
 }
@@ -45,16 +44,9 @@ const PRIORITY_COLORS: Record<string, string> = {
   High: 'bg-red-100 text-red-700',
 }
 
-// ─── Tab type ─────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'pending' | 'goals'
+// ─── Team Member Card (LM view: goals + lm_rating only) ───────────────────────
 
-// ─── Team Member Card with expandable goals ───────────────────────────────────
-type TeamMemberCardProps = {
-  member: Employee
-  managerEmployeeId: string
-}
-
-function TeamMemberCard({ member, managerEmployeeId }: TeamMemberCardProps) {
+function TeamMemberCard({ member, managerEmployeeId }: { member: Employee; managerEmployeeId: string }) {
   const [expanded, setExpanded] = useState(false)
   const [goals, setGoals] = useState<Goal[]>([])
   const [goalsLoading, setGoalsLoading] = useState(false)
@@ -106,12 +98,11 @@ function TeamMemberCard({ member, managerEmployeeId }: TeamMemberCardProps) {
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <Badge className="text-xs bg-purple-100 text-purple-700">{member.practice ?? 'N/A'}</Badge>
             <Badge className={cn('text-xs', STATUS_COLORS[member.active_status])}>{member.active_status}</Badge>
-            <Badge className="text-xs bg-gray-100 text-gray-600">{member.employment_type ?? 'Full Time'}</Badge>
           </div>
         </div>
 
         <Button variant="outline" size="sm" onClick={loadGoals} className="w-full">
-          {expanded ? 'Hide Goals' : 'View Goals'}
+          {expanded ? 'Hide Goals' : 'View Goals & Rate'}
         </Button>
 
         {expanded && (
@@ -131,7 +122,7 @@ function TeamMemberCard({ member, managerEmployeeId }: TeamMemberCardProps) {
                       <th className="px-3 py-2 text-center font-medium text-gray-600">Status</th>
                       <th className="px-3 py-2 text-center font-medium text-gray-600">Self%</th>
                       <th className="px-3 py-2 text-center font-medium text-gray-600">Self Rtg</th>
-                      <th className="px-3 py-2 text-center font-medium text-gray-600">LM Rtg</th>
+                      <th className="px-3 py-2 text-center font-medium text-gray-600">LM Rating</th>
                       <th className="px-3 py-2 text-center font-medium text-gray-600"></th>
                     </tr>
                   </thead>
@@ -152,23 +143,15 @@ function TeamMemberCard({ member, managerEmployeeId }: TeamMemberCardProps) {
                         <td className="px-3 py-2 text-center text-gray-600">{goal.self_rating ?? '—'}</td>
                         <td className="px-3 py-2 text-center">
                           <Input
-                            type="number"
-                            min={1}
-                            max={5}
-                            step={0.5}
+                            type="number" min={1} max={5} step={0.5}
                             className="w-16 text-xs p-1 text-center"
                             value={ratings[goal.id] ?? ''}
                             onChange={(e) => setRatings((prev) => ({ ...prev, [goal.id]: e.target.value }))}
                           />
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs py-0.5 px-2 h-7"
-                            disabled={savingId === goal.id}
-                            onClick={() => saveLmRating(goal)}
-                          >
+                          <Button size="sm" variant="outline" className="text-xs py-0.5 px-2 h-7"
+                            disabled={savingId === goal.id} onClick={() => saveLmRating(goal)}>
                             {savingId === goal.id ? '…' : 'Save'}
                           </Button>
                         </td>
@@ -185,12 +168,9 @@ function TeamMemberCard({ member, managerEmployeeId }: TeamMemberCardProps) {
   )
 }
 
-// ─── Pending Reviews Tab ──────────────────────────────────────────────────────
-type PendingReviewsProps = {
-  managerEmployeeId: string
-}
+// ─── Pending Reviews Tab (PM view: tasks + pm_rating/pm_comments only) ────────
 
-function PendingReviews({ managerEmployeeId }: PendingReviewsProps) {
+function PendingReviews({ managerEmployeeId }: { managerEmployeeId: string }) {
   const [tasks, setTasks] = useState<(Task & { employee_name?: string })[]>([])
   const [loading, setLoading] = useState(true)
   const [quarter, setQuarter] = useState('Q1')
@@ -226,31 +206,24 @@ function PendingReviews({ managerEmployeeId }: PendingReviewsProps) {
   async function saveTask(task: Task) {
     const vals = ratings[task.id]
     setSavingId(task.id)
-    await supabase
-      .from('quarterly_tasks')
-      .update({
-        pm_rating: vals.rating !== '' ? Number(vals.rating) : null,
-        pm_comments: vals.comments || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', task.id)
+    await supabase.from('quarterly_tasks').update({
+      pm_rating: vals.rating !== '' ? Number(vals.rating) : null,
+      pm_comments: vals.comments || null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', task.id)
     setSavingId(null)
   }
 
   async function markAllReviewed(employeeId: string) {
     setMarkingAll(employeeId)
-    await supabase
-      .from('quarterly_tasks')
-      .update({ submission_status: 'reviewed', updated_at: new Date().toISOString() })
-      .eq('employee_id', employeeId)
-      .eq('submitted_to', managerEmployeeId)
-      .eq('fiscal_year', fiscalYear)
-      .eq('quarter', quarter)
+    await supabase.from('quarterly_tasks').update({
+      submission_status: 'reviewed',
+      updated_at: new Date().toISOString(),
+    }).eq('employee_id', employeeId).eq('submitted_to', managerEmployeeId).eq('fiscal_year', fiscalYear).eq('quarter', quarter)
     await fetchTasks()
     setMarkingAll(null)
   }
 
-  // Group by employee
   const grouped: Record<string, { name: string; tasks: (Task & { employee_name?: string })[] }> = {}
   tasks.forEach((t) => {
     const eid = t.employee_id
@@ -260,7 +233,10 @@ function PendingReviews({ managerEmployeeId }: PendingReviewsProps) {
 
   return (
     <div className="space-y-5">
-      {/* Filters */}
+      <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+        <span className="font-semibold">Project Manager view</span> — You can rate tasks and add PM comments. Goal ratings are managed by the employee&apos;s Line Manager.
+      </div>
+
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-600">Quarter</label>
@@ -290,12 +266,7 @@ function PendingReviews({ managerEmployeeId }: PendingReviewsProps) {
         <div key={empId} className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-gray-800">{group.name}</h3>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={markingAll === empId}
-              onClick={() => markAllReviewed(empId)}
-            >
+            <Button size="sm" variant="outline" disabled={markingAll === empId} onClick={() => markAllReviewed(empId)}>
               {markingAll === empId ? 'Marking…' : 'Mark All Reviewed'}
             </Button>
           </div>
@@ -308,9 +279,7 @@ function PendingReviews({ managerEmployeeId }: PendingReviewsProps) {
                     <p className="font-semibold text-sm text-gray-800">{task.project_name}</p>
                     {task.task_id && <p className="text-xs text-gray-500 font-mono">{task.task_id}</p>}
                   </div>
-                  <Badge className={cn('text-xs', PRIORITY_COLORS[task.priority] ?? '')}>
-                    {task.priority}
-                  </Badge>
+                  <Badge className={cn('text-xs', PRIORITY_COLORS[task.priority] ?? '')}>{task.priority}</Badge>
                 </div>
 
                 <p className="text-sm text-gray-700 leading-relaxed">{task.task_description}</p>
@@ -333,23 +302,14 @@ function PendingReviews({ managerEmployeeId }: PendingReviewsProps) {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="PM Rating (1–5)">
-                    <Input
-                      type="number"
-                      min={1}
-                      max={5}
-                      step={0.5}
-                      placeholder="e.g. 4.0"
+                    <Input type="number" min={1} max={5} step={0.5} placeholder="e.g. 4.0"
                       value={ratings[task.id]?.rating ?? ''}
-                      onChange={(e) => setRatings((prev) => ({ ...prev, [task.id]: { ...prev[task.id], rating: e.target.value } }))}
-                    />
+                      onChange={(e) => setRatings((prev) => ({ ...prev, [task.id]: { ...prev[task.id], rating: e.target.value } }))} />
                   </Field>
                   <Field label="PM Comments">
-                    <Textarea
-                      rows={2}
-                      placeholder="Feedback for this task…"
+                    <Textarea rows={2} placeholder="Feedback for this task…"
                       value={ratings[task.id]?.comments ?? ''}
-                      onChange={(e) => setRatings((prev) => ({ ...prev, [task.id]: { ...prev[task.id], comments: e.target.value } }))}
-                    />
+                      onChange={(e) => setRatings((prev) => ({ ...prev, [task.id]: { ...prev[task.id], comments: e.target.value } }))} />
                   </Field>
                 </div>
 
@@ -367,14 +327,11 @@ function PendingReviews({ managerEmployeeId }: PendingReviewsProps) {
   )
 }
 
-// ─── Goal Reviews Tab ─────────────────────────────────────────────────────────
-type GoalReviewsProps = {
-  teamEmployeeIds: string[]
-}
+// ─── Goal Reviews Tab (LM view: lm_rating only, no pm data) ──────────────────
 
 type GoalWithEmployee = Goal & { employee_name?: string }
 
-function GoalReviews({ teamEmployeeIds }: GoalReviewsProps) {
+function GoalReviews({ lmReportIds }: { lmReportIds: string[] }) {
   const [goals, setGoals] = useState<GoalWithEmployee[]>([])
   const [loading, setLoading] = useState(true)
   const [fiscalYear, setFiscalYear] = useState('2026-27')
@@ -382,13 +339,13 @@ function GoalReviews({ teamEmployeeIds }: GoalReviewsProps) {
   const [savingId, setSavingId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (teamEmployeeIds.length === 0) { setLoading(false); return }
+    if (lmReportIds.length === 0) { setLoading(false); return }
     async function fetch() {
       setLoading(true)
       const { data } = await supabase
         .from('goals')
         .select('*, employees!goals_employee_id_fkey(name)')
-        .in('employee_id', teamEmployeeIds)
+        .in('employee_id', lmReportIds)
         .eq('fiscal_year', fiscalYear)
         .order('employee_id', { ascending: true })
       const mapped = (data ?? []).map((g: Record<string, unknown>) => ({
@@ -402,7 +359,7 @@ function GoalReviews({ teamEmployeeIds }: GoalReviewsProps) {
       setLoading(false)
     }
     fetch()
-  }, [teamEmployeeIds, fiscalYear])
+  }, [lmReportIds, fiscalYear])
 
   async function saveRating(goal: GoalWithEmployee) {
     setSavingId(goal.id)
@@ -418,6 +375,10 @@ function GoalReviews({ teamEmployeeIds }: GoalReviewsProps) {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-100 rounded-xl text-xs text-green-700">
+        <span className="font-semibold">Line Manager view</span> — You can set LM ratings for your direct reports&apos; goals. Task ratings are managed by the employee&apos;s Project Manager.
+      </div>
+
       <div className="flex items-center gap-2">
         <label className="text-sm font-medium text-gray-600">Fiscal Year</label>
         <Select className="w-32" value={fiscalYear} onChange={(e) => setFiscalYear(e.target.value)} options={FISCAL_YEARS.map((y) => ({ label: y, value: y }))} />
@@ -427,7 +388,7 @@ function GoalReviews({ teamEmployeeIds }: GoalReviewsProps) {
 
       {!loading && goals.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-500">No goals found for your team in {fiscalYear}.</p>
+          <p className="text-gray-500">No goals found for your direct reports in {fiscalYear}.</p>
         </div>
       )}
 
@@ -458,24 +419,13 @@ function GoalReviews({ teamEmployeeIds }: GoalReviewsProps) {
                   <td className="px-4 py-3 text-center text-gray-600">{goal.weightage_percent ?? '—'}</td>
                   <td className="px-4 py-3 text-center text-gray-600">{goal.self_rating ?? '—'}</td>
                   <td className="px-4 py-3 text-center">
-                    <Input
-                      type="number"
-                      min={1}
-                      max={5}
-                      step={0.5}
+                    <Input type="number" min={1} max={5} step={0.5}
                       className="w-20 text-sm p-1.5 text-center mx-auto"
                       value={ratings[goal.id] ?? ''}
-                      onChange={(e) => setRatings((prev) => ({ ...prev, [goal.id]: e.target.value }))}
-                    />
+                      onChange={(e) => setRatings((prev) => ({ ...prev, [goal.id]: e.target.value }))} />
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs"
-                      disabled={savingId === goal.id}
-                      onClick={() => saveRating(goal)}
-                    >
+                    <Button size="sm" variant="outline" className="text-xs" disabled={savingId === goal.id} onClick={() => saveRating(goal)}>
                       {savingId === goal.id ? '…' : 'Save'}
                     </Button>
                   </td>
@@ -490,34 +440,67 @@ function GoalReviews({ teamEmployeeIds }: GoalReviewsProps) {
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function TeamPage() {
-  const router = useRouter()
   const { employee, loading: authLoading } = useAuth()
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
-  const [team, setTeam] = useState<Employee[]>([])
+  const [activeTab, setActiveTab] = useState<Tab | null>(null)
+  const [lmReports, setLmReports] = useState<Employee[]>([])
+  const [pmReports, setPmReports] = useState<Employee[]>([])
   const [teamLoading, setTeamLoading] = useState(true)
 
-  useEffect(() => {
-    if (authLoading) return
-    if (employee && employee.role === 'employee') {
-      router.replace('/portal')
-    }
-  }, [authLoading, employee, router])
+  // Determine access: LM, PM, or HR
+  const isHR = employee?.role === 'hr'
+  const hasLMAccess = isHR || (employee?.isLineManager ?? false)
+  const hasPMAccess = isHR || (employee?.isProjectManager ?? false)
+  const canAccessPage = hasLMAccess || hasPMAccess
 
+  // Fetch direct reports
   useEffect(() => {
-    if (!employee || employee.role === 'employee') return
+    if (!employee || authLoading) return
+    if (!hasLMAccess && !hasPMAccess) return
+
     async function fetchTeam() {
       setTeamLoading(true)
-      const { data } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('line_manager', employee!.employee_id)
-        .order('name', { ascending: true })
-      setTeam((data ?? []) as Employee[])
+      const eid = employee!.employee_id
+
+      if (isHR) {
+        // HR sees all employees
+        const { data } = await supabase.from('employees').select('*').eq('active_status', 'Active').order('name')
+        const all = (data ?? []) as Employee[]
+        setLmReports(all)
+        setPmReports(all)
+      } else {
+        const [lmRes, pmRes] = await Promise.all([
+          hasLMAccess
+            ? supabase.from('employees').select('*').eq('line_manager', eid).order('name')
+            : Promise.resolve({ data: [] }),
+          hasPMAccess
+            ? supabase.from('employees').select('*').eq('project_manager', eid).order('name')
+            : Promise.resolve({ data: [] }),
+        ])
+        setLmReports((lmRes.data ?? []) as Employee[])
+        setPmReports((pmRes.data ?? []) as Employee[])
+      }
       setTeamLoading(false)
     }
     fetchTeam()
-  }, [employee])
+  }, [employee, authLoading, isHR, hasLMAccess, hasPMAccess])
+
+  // Redirect non-managers to portal
+  useEffect(() => {
+    if (!authLoading && employee && !canAccessPage) {
+      window.location.href = '/portal'
+    }
+  }, [authLoading, employee, canAccessPage])
+
+  // Set initial tab when data loads
+  useEffect(() => {
+    if (!teamLoading && activeTab === null) {
+      if (hasLMAccess && lmReports.length > 0) setActiveTab('overview')
+      else if (hasPMAccess) setActiveTab('pending')
+      else if (hasLMAccess) setActiveTab('overview')
+    }
+  }, [teamLoading, activeTab, hasLMAccess, hasPMAccess, lmReports.length])
 
   if (authLoading) {
     return (
@@ -528,19 +511,46 @@ export default function TeamPage() {
     )
   }
 
-  if (!employee || employee.role === 'employee') return null
+  if (!employee || !canAccessPage) return null
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: 'overview', label: 'Team Overview' },
-    { id: 'pending', label: 'Pending Reviews' },
-    { id: 'goals', label: 'Goal Reviews' },
+  // Build tabs dynamically based on which roles this employee holds
+  const tabs: { id: Tab; label: string; badge?: string }[] = [
+    ...(hasLMAccess ? [{ id: 'overview' as Tab, label: 'Team Overview', badge: 'LM' }] : []),
+    ...(hasPMAccess ? [{ id: 'pending' as Tab, label: 'Pending Reviews', badge: 'PM' }] : []),
+    ...(hasLMAccess ? [{ id: 'goals' as Tab, label: 'Goal Reviews', badge: 'LM' }] : []),
   ]
+
+  const currentTab = activeTab ?? tabs[0]?.id
+
+  const roleLabel = hasLMAccess && hasPMAccess
+    ? 'Line Manager & Project Manager'
+    : hasLMAccess
+    ? 'Line Manager'
+    : 'Project Manager'
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      <Header title="My Team" subtitle={employee.name} />
+      <Header title="My Team" subtitle={roleLabel} />
 
       <div className="flex-1 p-6 space-y-5 max-w-5xl mx-auto w-full">
+
+        {/* Role summary chips */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {hasLMAccess && (
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-green-50 border border-green-200 rounded-full text-xs text-green-700 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+              Line Manager — {isHR ? 'all' : lmReports.length} direct report{lmReports.length !== 1 ? 's' : ''}
+              <span className="text-green-500 text-[10px]">(Goals &amp; Reviews)</span>
+            </div>
+          )}
+          {hasPMAccess && (
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-700 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+              Project Manager — {isHR ? 'all' : pmReports.length} project report{pmReports.length !== 1 ? 's' : ''}
+              <span className="text-blue-500 text-[10px]">(Tasks &amp; PM Feedback)</span>
+            </div>
+          )}
+        </div>
 
         {/* Tabs */}
         <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 w-fit">
@@ -549,46 +559,55 @@ export default function TeamPage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'px-4 py-2 text-sm font-medium rounded-lg transition-colors',
-                activeTab === tab.id
+                'px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5',
+                currentTab === tab.id
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
               )}
             >
               {tab.label}
+              {tab.badge && (
+                <span className={cn(
+                  'text-[10px] font-bold px-1.5 py-0.5 rounded-full',
+                  currentTab === tab.id
+                    ? 'bg-white/20 text-white'
+                    : tab.badge === 'LM' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'
+                )}>{tab.badge}</span>
+              )}
             </button>
           ))}
         </div>
 
-        {/* Tab: Team Overview */}
-        {activeTab === 'overview' && (
-          <div className="space-y-4">
-            {teamLoading && <div className="flex justify-center py-10"><Spinner /></div>}
-            {!teamLoading && team.length === 0 && (
-              <div className="text-center py-16">
-                <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <p className="text-gray-600 font-medium">No team members yet</p>
-                <p className="text-gray-400 text-sm mt-1">Employees with you as their line manager will appear here.</p>
+        {teamLoading && <div className="flex justify-center py-10"><Spinner /></div>}
+
+        {!teamLoading && (
+          <>
+            {/* Team Overview — LM only: shows direct reports with goal expand + lm_rating */}
+            {currentTab === 'overview' && hasLMAccess && (
+              <div className="space-y-4">
+                {lmReports.length === 0 ? (
+                  <div className="text-center py-16">
+                    <p className="text-gray-600 font-medium">No direct reports yet</p>
+                    <p className="text-gray-400 text-sm mt-1">Employees with you as their line manager will appear here.</p>
+                  </div>
+                ) : (
+                  lmReports.map((member) => (
+                    <TeamMemberCard key={member.id} member={member} managerEmployeeId={employee.employee_id} />
+                  ))
+                )}
               </div>
             )}
-            {!teamLoading && team.map((member) => (
-              <TeamMemberCard key={member.id} member={member} managerEmployeeId={employee.employee_id} />
-            ))}
-          </div>
-        )}
 
-        {/* Tab: Pending Reviews */}
-        {activeTab === 'pending' && (
-          <PendingReviews managerEmployeeId={employee.employee_id} />
-        )}
+            {/* Pending Reviews — PM only: submitted tasks + pm_rating/pm_comments */}
+            {currentTab === 'pending' && hasPMAccess && (
+              <PendingReviews managerEmployeeId={employee.employee_id} />
+            )}
 
-        {/* Tab: Goal Reviews */}
-        {activeTab === 'goals' && (
-          <GoalReviews teamEmployeeIds={team.map((m) => m.employee_id)} />
+            {/* Goal Reviews — LM only: all direct reports' goals in a table */}
+            {currentTab === 'goals' && hasLMAccess && (
+              <GoalReviews lmReportIds={lmReports.map((m) => m.employee_id)} />
+            )}
+          </>
         )}
       </div>
     </div>

@@ -6,6 +6,8 @@ export type UserRole = 'hr' | 'manager' | 'employee'
 export type AuthEmployee = Employee & {
   role: UserRole
   user_id: string
+  isLineManager: boolean
+  isProjectManager: boolean
 }
 
 export async function getCurrentEmployee(): Promise<AuthEmployee | null> {
@@ -35,7 +37,20 @@ export async function getCurrentEmployee(): Promise<AuthEmployee | null> {
   if (!emp) return null
 
   const role = getRole(emp)
-  return { ...emp, role, user_id: user.id }
+
+  // Check if this employee is a line manager or project manager of anyone
+  const [{ count: lmCount }, { count: pmCount }] = await Promise.all([
+    supabase.from('employees').select('id', { count: 'exact', head: true }).eq('line_manager', emp.employee_id),
+    supabase.from('employees').select('id', { count: 'exact', head: true }).eq('project_manager', emp.employee_id),
+  ])
+
+  return {
+    ...emp,
+    role,
+    user_id: user.id,
+    isLineManager: (lmCount ?? 0) > 0,
+    isProjectManager: (pmCount ?? 0) > 0,
+  }
 }
 
 function getRole(emp: Employee): UserRole {
