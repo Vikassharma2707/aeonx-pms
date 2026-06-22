@@ -44,6 +44,7 @@ export type Employee = {
   active_status: 'Active' | 'Inactive'
   appraisal_band?: string
   email?: string
+  system_role?: string[]
   created_at?: string
   updated_at?: string
 }
