@@ -724,20 +724,40 @@ function PendingReviews({ managerEmployeeId }: { managerEmployeeId: string }) {
 }
 
 // ─── PM Quarterly Feedback Tab ────────────────────────────────────────────────
+// Derives the employee list dynamically from tasks submitted to this PM
 
-function PMQuarterlyFeedback({ pmReports }: { pmReports: Employee[] }) {
+function PMQuarterlyFeedback({ managerEmployeeId }: { managerEmployeeId: string }) {
   const [quarter, setQuarter] = useState('Q1')
   const [fiscalYear, setFiscalYear] = useState('2026-27')
+  const [pmReports, setPmReports] = useState<Employee[]>([])
   const [feedbackMap, setFeedbackMap] = useState<Record<string, Partial<QuarterlyFeedback>>>({})
   const [existingIds, setExistingIds] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
 
   useEffect(() => {
-    if (pmReports.length === 0) { setLoading(false); return }
     async function fetch() {
       setLoading(true)
-      const ids = pmReports.map(e => e.employee_id)
+
+      // Derive unique employees who submitted tasks to this PM this quarter
+      const { data: taskData } = await supabase
+        .from('quarterly_tasks')
+        .select('employee_id, employees!quarterly_tasks_employee_id_fkey(employee_id, name, designation)')
+        .eq('submitted_to', managerEmployeeId)
+        .eq('fiscal_year', fiscalYear)
+        .eq('quarter', quarter)
+
+      const uniqueMap: Record<string, Employee> = {}
+      ;(taskData ?? []).forEach((t: Record<string, unknown>) => {
+        const emp = t.employees as Employee | null
+        if (emp) uniqueMap[emp.employee_id] = emp
+      })
+      const reports = Object.values(uniqueMap)
+      setPmReports(reports)
+
+      if (reports.length === 0) { setLoading(false); return }
+
+      const ids = reports.map(e => e.employee_id)
       const { data } = await supabase.from('quarterly_feedback').select('*')
         .in('employee_id', ids).eq('fiscal_year', fiscalYear).eq('quarter', quarter)
       const map: Record<string, Partial<QuarterlyFeedback>> = {}
@@ -752,7 +772,7 @@ function PMQuarterlyFeedback({ pmReports }: { pmReports: Employee[] }) {
       setLoading(false)
     }
     fetch()
-  }, [pmReports, quarter, fiscalYear])
+  }, [managerEmployeeId, quarter, fiscalYear])
 
   function update(empId: string, field: keyof QuarterlyFeedback, value: string | number) {
     setFeedbackMap(prev => ({ ...prev, [empId]: { ...prev[empId], [field]: value } }))
@@ -889,7 +909,6 @@ export default function TeamPage() {
   const { employee, loading: authLoading } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab | null>(null)
   const [lmReports, setLmReports] = useState<Employee[]>([])
-  const [pmReports, setPmReports] = useState<Employee[]>([])
   const [teamLoading, setTeamLoading] = useState(true)
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0)
 
@@ -908,15 +927,10 @@ export default function TeamPage() {
 
       if (isHR) {
         const { data } = await supabase.from('employees').select('*').eq('active_status', 'Active').order('name')
-        const all = (data ?? []) as Employee[]
-        setLmReports(all); setPmReports(all)
-      } else {
-        const [lmRes, pmRes] = await Promise.all([
-          hasLMAccess ? supabase.from('employees').select('*').eq('line_manager', eid).order('name') : Promise.resolve({ data: [] }),
-          hasPMAccess ? supabase.from('employees').select('*').eq('project_manager', eid).order('name') : Promise.resolve({ data: [] }),
-        ])
-        setLmReports((lmRes.data ?? []) as Employee[])
-        setPmReports((pmRes.data ?? []) as Employee[])
+        setLmReports((data ?? []) as Employee[])
+      } else if (hasLMAccess) {
+        const { data } = await supabase.from('employees').select('*').eq('line_manager', eid).order('name')
+        setLmReports((data ?? []) as Employee[])
       }
       setTeamLoading(false)
     }
@@ -986,7 +1000,7 @@ export default function TeamPage() {
           {hasPMAccess && (
             <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-700 font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
-              Project Manager — {isHR ? 'all' : pmReports.length} project report{pmReports.length !== 1 ? 's' : ''}
+              Project Manager — task-based reports
               <span className="text-blue-500 text-[10px]">(Tasks &amp; Feedback)</span>
             </div>
           )}
@@ -1030,7 +1044,7 @@ export default function TeamPage() {
             {currentTab === 'midyear'    && hasLMAccess && <MidYearReviews lmReports={lmReports} />}
             {currentTab === 'goals'      && hasLMAccess && <GoalReviews lmReportIds={lmReports.map(m => m.employee_id)} />}
             {currentTab === 'pending'    && hasPMAccess && <PendingReviews managerEmployeeId={employee.employee_id} />}
-            {currentTab === 'pmfeedback' && hasPMAccess && <PMQuarterlyFeedback pmReports={pmReports} />}
+            {currentTab === 'pmfeedback' && hasPMAccess && <PMQuarterlyFeedback managerEmployeeId={employee.employee_id} />}
           </>
         )}
       </div>

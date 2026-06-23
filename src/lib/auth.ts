@@ -38,18 +38,21 @@ export async function getCurrentEmployee(): Promise<AuthEmployee | null> {
 
   const role = getRole(emp)
 
-  // Check if this employee is a line manager or project manager of anyone
-  const [{ count: lmCount }, { count: pmCount }] = await Promise.all([
+  // LM: any employee has this person as line_manager
+  // PM: system_role includes 'project_manager' OR any task has been submitted to them
+  const [{ count: lmCount }, { count: pmTaskCount }] = await Promise.all([
     supabase.from('employees').select('id', { count: 'exact', head: true }).eq('line_manager', emp.employee_id),
-    supabase.from('employees').select('id', { count: 'exact', head: true }).eq('project_manager', emp.employee_id),
+    supabase.from('quarterly_tasks').select('id', { count: 'exact', head: true }).eq('submitted_to', emp.employee_id),
   ])
+
+  const hasPMRole = (emp.system_role ?? []).includes('project_manager')
 
   return {
     ...emp,
     role,
     user_id: user.id,
     isLineManager: (lmCount ?? 0) > 0,
-    isProjectManager: (pmCount ?? 0) > 0,
+    isProjectManager: hasPMRole || (pmTaskCount ?? 0) > 0,
   }
 }
 
