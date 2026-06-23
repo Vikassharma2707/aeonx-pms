@@ -65,6 +65,9 @@ export type Goal = {
   lm_rating?: number
   weighted_goal_score?: number
   goal_comments?: string
+  approval_status?: 'draft' | 'pending_approval' | 'approved' | 'changes_requested'
+  approval_comment?: string
+  approved_at?: string
   created_at?: string
   updated_at?: string
 }
