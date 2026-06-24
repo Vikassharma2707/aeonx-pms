@@ -16,9 +16,8 @@ SELECT employee_id, name, designation, practice, appraisal_band
 FROM employees
 WHERE active_status = 'Active'
   AND (
-    designation ILIKE '%Manager%'
-    OR designation ILIKE '%Senior%'
-    OR appraisal_band IN ('MM', 'SM', 'DM', 'AM', 'Partner')
+    appraisal_band ILIKE 'MM%'
+    OR appraisal_band ILIKE 'SM%'
   );
 
 -- 3. Notifications table

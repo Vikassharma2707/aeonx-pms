@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { QUARTERS, FISCAL_YEARS, TASK_STATUSES, PRIORITIES, STATUS_COLORS } from '@/lib/constants'
 import type { QuarterlyTask, Employee } from '@/lib/supabase'
 import { Send } from 'lucide-react'
+import { Combobox } from '@/components/ui/combobox'
 
 type Task = QuarterlyTask & {
   submission_status?: 'draft' | 'submitted' | 'reviewed'
@@ -273,7 +274,11 @@ export default function MyTasksPage() {
   useEffect(() => { fetchTasks() }, [fetchTasks])
 
   useEffect(() => {
-    supabase.from('mm_sm_employees').select('*')
+    // Fetch all active employees with MM or SM appraisal bands (MM01–MM05, SM01–SM05)
+    supabase.from('employees').select('employee_id, name, designation, appraisal_band')
+      .eq('active_status', 'Active')
+      .or('appraisal_band.ilike.MM%,appraisal_band.ilike.SM%')
+      .order('name')
       .then(({ data }) => { if (data) setManagers(data as Employee[]) })
   }, [])
 
@@ -431,9 +436,16 @@ export default function MyTasksPage() {
                 onChange={e => setField('project_name', e.target.value)} />
             </Field>
             <Field label="Project Manager" required>
-              <Select value={form.project_manager} onChange={e => setField('project_manager', e.target.value)}
-                placeholder="Select PM…"
-                options={managers.map(m => ({ label: `${m.name}${m.designation ? ` — ${m.designation}` : ''}`, value: m.employee_id }))} />
+              <Combobox
+                value={form.project_manager}
+                onChange={v => setField('project_manager', v)}
+                placeholder="Search by name or band…"
+                options={managers.map(m => ({
+                  value: m.employee_id,
+                  label: m.name,
+                  sublabel: [m.designation, m.appraisal_band].filter(Boolean).join(' · '),
+                }))}
+              />
             </Field>
           </div>
 
