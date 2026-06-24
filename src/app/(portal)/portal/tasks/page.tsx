@@ -66,7 +66,6 @@ type TaskCardProps = {
 
 function TaskCard({ task, managers, onSave, onDelete, onSubmit }: TaskCardProps) {
   const [status, setStatus] = useState(task.task_status)
-  const [selfRating, setSelfRating] = useState(String(task.self_rating ?? ''))
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -81,10 +80,7 @@ function TaskCard({ task, managers, onSave, onDelete, onSubmit }: TaskCardProps)
 
   async function handleSave() {
     setSaving(true)
-    await onSave(task.id, {
-      task_status: status as Task['task_status'],
-      self_rating: selfRating !== '' ? Number(selfRating) : undefined,
-    })
+    await onSave(task.id, { task_status: status as Task['task_status'] })
     setSaving(false)
     setDirty(false)
   }
@@ -145,14 +141,10 @@ function TaskCard({ task, managers, onSave, onDelete, onSubmit }: TaskCardProps)
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <Field label="Task Status">
             <Select value={status} onChange={(e) => { setStatus(e.target.value as Task['task_status']); setDirty(true) }}
               options={TASK_STATUSES.map(s => ({ label: s, value: s }))} disabled={!isDraft} />
-          </Field>
-          <Field label="Self Rating (1–5)">
-            <Input type="number" min={1} max={5} step={0.5} placeholder="e.g. 3.5"
-              value={selfRating} onChange={(e) => { setSelfRating(e.target.value); setDirty(true) }} disabled={!isDraft} />
           </Field>
           <Field label="PM Rating">
             <Input type="number" value={task.pm_rating ?? ''} readOnly disabled placeholder="Set by PM" className="bg-gray-50 cursor-not-allowed" />
@@ -223,7 +215,6 @@ type TaskForm = {
   actual_outcome: string
   priority: string
   task_status: string
-  self_rating: string
 }
 
 const EMPTY_FORM: TaskForm = {
@@ -235,7 +226,6 @@ const EMPTY_FORM: TaskForm = {
   actual_outcome: '',
   priority: 'Medium',
   task_status: 'Not Started',
-  self_rating: '',
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -327,7 +317,6 @@ export default function MyTasksPage() {
       actual_outcome: form.actual_outcome.trim() || null,
       priority: form.priority as QuarterlyTask['priority'],
       task_status: form.task_status as QuarterlyTask['task_status'],
-      self_rating: form.self_rating !== '' ? Number(form.self_rating) : null,
       submission_status: 'draft',
     }
 
@@ -478,11 +467,6 @@ export default function MyTasksPage() {
                 onChange={e => setField('actual_outcome', e.target.value)} />
             </Field>
           </div>
-
-          <Field label="Self Rating (1–5)">
-            <Input type="number" min={1} max={5} step={0.5} placeholder="e.g. 4.0"
-              value={form.self_rating} onChange={e => setField('self_rating', e.target.value)} className="w-40" />
-          </Field>
 
           <p className="text-xs text-gray-400">
             The task will be saved as draft. Use the <strong>Submit to PM</strong> button on each task card to submit when ready.
