@@ -15,6 +15,7 @@ import {
   Award,
   ChevronRight,
   ShieldCheck,
+  BarChart2,
 } from 'lucide-react'
 
 const navItems = [
@@ -25,6 +26,7 @@ const navItems = [
   { href: '/feedback', label: 'PM Feedback', icon: MessageSquare },
   { href: '/midyear', label: 'Mid-Year Review', icon: FileCheck },
   { href: '/appraisal', label: 'Final Appraisal', icon: Award },
+  { href: '/reports', label: 'Reports & Alerts', icon: BarChart2 },
   { href: '/security', label: 'Security & Access', icon: ShieldCheck },
 ]
 
