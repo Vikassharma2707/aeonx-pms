@@ -5,8 +5,10 @@ import { setAdminSession, isAdminSession } from '@/lib/adminSession'
 import Image from 'next/image'
 import { Eye, EyeOff, Lock, Mail, Target, BarChart3, Users, Award, ShieldCheck } from 'lucide-react'
 
-const ADMIN_USERNAME = 'Administrator'
-const ADMIN_PASSWORD = 'Aeonx@12345'
+const ADMIN_ACCOUNTS: Record<string, string> = {
+  Administrator: 'Aeonx@12345',
+  Aeonxhr: 'Aeonx@12345',
+}
 
 const features = [
   { icon: Target,    title: 'Goal Management',   desc: 'Annual goals with KPIs & weightage' },
@@ -32,7 +34,7 @@ export default function LoginPage() {
     }
   }, [])
 
-  const isAdmin = username === ADMIN_USERNAME
+  const isAdmin = username in ADMIN_ACCOUNTS
 
   async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault()
@@ -58,9 +60,9 @@ export default function LoginPage() {
     const u = username.trim()
     const p = password.trim()
 
-    // â”€â”€ Admin path â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    if (u === ADMIN_USERNAME) {
-      if (p !== ADMIN_PASSWORD) {
+    // ── Admin path ──────────────────────────────────────────────────────
+    if (u in ADMIN_ACCOUNTS) {
+      if (p !== ADMIN_ACCOUNTS[u]) {
         setError('Incorrect admin password.')
         return
       }
@@ -70,7 +72,7 @@ export default function LoginPage() {
       return
     }
 
-    // â”€â”€ Employee path â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Employee path ────────────────────────────────────────────────────
     setLoading(true)
     setStatus('Checking credentials...')
     try {
@@ -258,7 +260,7 @@ export default function LoginPage() {
                         type="text"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        placeholder="Administrator or you@aeonx.digital"
+                        placeholder="Admin username or you@aeonx.digital"
                         className="w-full h-10 pl-9 pr-4 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
                         required autoFocus autoComplete="username" spellCheck={false} suppressHydrationWarning
                       />
