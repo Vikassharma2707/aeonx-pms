@@ -16,18 +16,20 @@ import {
   ChevronRight,
   ShieldCheck,
   BarChart2,
+  UserCog,
 } from 'lucide-react'
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/employees', label: 'Employees', icon: Users },
-  { href: '/goals', label: 'Goal Setting', icon: Target },
-  { href: '/tasks', label: 'Task Log', icon: ClipboardList },
-  { href: '/feedback', label: 'PM Feedback', icon: MessageSquare },
-  { href: '/midyear', label: 'Mid-Year Review', icon: FileCheck },
-  { href: '/appraisal', label: 'Final Appraisal', icon: Award },
-  { href: '/reports', label: 'Reports & Alerts', icon: BarChart2 },
-  { href: '/security', label: 'Security & Access', icon: ShieldCheck },
+  { href: '/dashboard',     label: 'Dashboard',         icon: LayoutDashboard },
+  { href: '/employees',     label: 'Employees',          icon: Users },
+  { href: '/goals',         label: 'Goal Setting',       icon: Target },
+  { href: '/tasks',         label: 'Task Log',           icon: ClipboardList },
+  { href: '/feedback',      label: 'PM Feedback',        icon: MessageSquare },
+  { href: '/midyear',       label: 'Mid-Year Review',    icon: FileCheck },
+  { href: '/appraisal',     label: 'Final Appraisal',    icon: Award },
+  { href: '/reports',       label: 'Reports & Alerts',   icon: BarChart2 },
+  { href: '/security',      label: 'Security & Access',  icon: ShieldCheck },
+  { href: '/admin-users',   label: 'Admin Users',        icon: UserCog },
 ]
 
 export function Sidebar() {

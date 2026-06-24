@@ -5,10 +5,6 @@ import { setAdminSession, isAdminSession } from '@/lib/adminSession'
 import Image from 'next/image'
 import { Eye, EyeOff, Lock, Mail, Target, BarChart3, Users, Award, ShieldCheck } from 'lucide-react'
 
-const ADMIN_ACCOUNTS: Record<string, string> = {
-  Administrator: 'Aeonx@12345',
-  Aeonxhr: 'Aeonx@12345',
-}
 
 const features = [
   { icon: Target,    title: 'Goal Management',   desc: 'Annual goals with KPIs & weightage' },
@@ -34,7 +30,8 @@ export default function LoginPage() {
     }
   }, [])
 
-  const isAdmin = username in ADMIN_ACCOUNTS
+  // No @ means it's a username (admin), not an employee email
+  const isAdmin = username.trim() !== '' && !username.includes('@')
 
   async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault()
@@ -61,12 +58,21 @@ export default function LoginPage() {
     const p = password.trim()
 
     // ── Admin path ──────────────────────────────────────────────────────
-    if (u in ADMIN_ACCOUNTS) {
-      if (p !== ADMIN_ACCOUNTS[u]) {
-        setError('Incorrect admin password.')
+    if (!u.includes('@')) {
+      setStatus('Verifying admin credentials…')
+      const res = await fetch('/api/auth/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u, password: p }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Login failed.')
+        setStatus('')
+        setLoading(false)
         return
       }
-      setStatus('Signing in as Administrator...')
+      setStatus(`Signing in as ${data.fullName ?? data.username}…`)
       setAdminSession()
       window.location.href = '/dashboard'
       return
